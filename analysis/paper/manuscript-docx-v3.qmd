@@ -1,41 +1,59 @@
 ---
 title: "seqwrap: an R package for flexible iterative fitting of high-dimensional data"
-author: Chidimma Echebiri^1,2^  Rafi Ahmad^1,3^ Stian Ellefsen^2^ Daniel Hammarström^2,£^
-#  - name: Chidimma Echebiri^1,2^
-#    email: chidimma.echebiri@inn.no
-#    affiliation:
-#      - name: University of Inland Norway
-#        department: Department of Biotechnology, PhD programme in applied ecology and biotechnology
-#  - name: Rafi Ahmad^1^
-#    email: rafi.ahmad@inn.no
-#    affiliation: 
-#      - name: University of Inland Norway
-#        department: Department of Biotechnology
-#      - name: UiT - The Arctic University of Norway, Tromsø, Norway
-#        department: Institute of Clinical Medicine, Faculty of Health Sciences
-#  - name: Stian Ellefsen^2^
-#    email: stian.ellefsen@inn.no
-#    affiliation: 
-#      - name: University of Inland Norway
-#        department: Department of Public Health and Sport Sciences 
-#  - name: Daniel Hammarström^2,£^
-#    email: daniel.hammarstrom@inn.no
-#    affiliation: 
-#      - name: University of Inland Norway
-#        department: Department of Public Health and Sport Sciences 
-#    attributes:
-#      corresponding: true
+author:
+  - name: Chidimma Echebiri^1,2^
+    email: chidimma.echebiri@inn.no
+    affiliation:
+      - name: University of Inland Norway
+        department: Department of Biotechnology, PhD programme in applied ecology and biotechnology
+  - name: Rafi Ahmad^1^
+    email: rafi.ahmad@inn.no
+    affiliation: 
+      - name: University of Inland Norway
+        department: Department of Biotechnology
+      - name: UiT - The Arctic University of Norway, Tromsø, Norway
+        department: Institute of Clinical Medicine, Faculty of Health Sciences
+  - name: Stian Ellefsen^2^
+    email: stian.ellefsen@inn.no
+    affiliation: 
+      - name: University of Inland Norway
+        department: Department of Public Health and Sport Sciences 
+  - name: Daniel Hammarström^2,£^
+    email: daniel.hammarstrom@inn.no
+    affiliation: 
+      - name: University of Inland Norway
+        department: Department of Public Health and Sport Sciences 
+    attributes:
+      corresponding: true
 format: 
   docx:
-    reference-doc: resources/template.docx
-csl: resources/bmc-bioinformatics.csl
-bibliography: resources/bibliography.bib
+    reference-doc: "../templates/template.docx"
+execute:
+  echo: true
+  warning: false
+  message: false
+  comment: "#>"
+  fig-path: "../figures/"
+  fig-dpi: 600
+filters:
+  - ../templates/scholarly-metadata.lua
+  - ../templates/author-info-blocks.lua
+  - ../templates/pagebreak.lua
+csl: "../templates/bmc-bioinformatics.csl"
+bibliography: "../templates/bibliography.bib"
 abstract: |
-
+      **Background:** High-dimensional omics data from complex experimental designs, particularly those with hierarchical structures such as repeated measures, require flexible statistical modeling approaches. While traditionally used packages for, e.g., RNA-seq analysis, include mechanisms for parameter shrinkage to increase statistical efficiency, they often limit modeling flexibility, including choices of distributional assumptions and random-effects structures necessary for hierarchical data. Currently, there is a lack of tools that enable shrinkage mechanisms in hierarchical data models and support a general workflow across different types of omics data.
+ 
+  **Results:** We present seqwrap, an R package that provides a flexible framework for iterative modeling of high-dimensional data using established R-based regression packages. Leveraging recent developments in the glmmTMB package, seqwrap can enable a two-step approach to fit negative binomial and Poisson observation-level random effect mixed-effects models with empirical Bayes shrinkage of model parameters. In simulations of RNA-seq data from a repeated-measures design, we use seqwrap to show that regularized models substantially outperformed non-informed models and mixed-effects models using transformed counts, with higher sensitivity for detecting differentially expressed genes while maintaining false discovery rates below nominal levels. Regularization also improved model convergence, producing valid estimates for >99.9% of gene targets compared to 85-90% for non-informed count-based models. In real-world data, flexibility in defining distributional assumptions enabled thorough examination of model assumptions and robust sensitivity analysis across modeling approaches.  
+ 
+  **Conclusions:** seqwrap enables flexible, principled workflows for analyzing high-dimensional data from complex experimental designs with hierarchical structures. By combining established modeling frameworks with empirical Bayes regularization, seqwrap provides improved statistical performance and model convergence compared to both transformation-based approaches and non-informed models while maintaining generalizability across diverse omics data types.
+keywords: |
+  High-dimensional data, RNA-seq, hierarchical models, shrinkage
 editor_options: 
   chunk_output_type: console
 ---
 
+<!--
 ::: {custom-style="affiliation"}
 ^1^Department of Biotechnology, University of Inland Norway - Hamar, Norway
 
@@ -45,24 +63,12 @@ editor_options:
 
 ^£^Corresponding author name and email address: Daniel Hammarström - daniel.hammarstrom@inn.no
 :::
-
-
-::: {custom-style="Abstract"}
-
-**Background:** High-dimensional omics data from complex experimental designs, particularly those with hierarchical structures such as repeated measures, require flexible statistical modeling approaches. While traditionally used packages for, e.g., RNA-seq analysis, include mechanisms for parameter shrinkage to increase statistical efficiency, they often limit modeling flexibility, including choices of distributional assumptions and random-effects structures necessary for hierarchical data. Currently, there is a lack of tools that enable shrinkage mechanisms in hierarchical data models and support a general workflow across different types of omics data.
- 
-  **Results:** We present seqwrap, an R package that provides a flexible framework for iterative modeling of high-dimensional data using established R-based regression packages. Leveraging recent developments in the glmmTMB package, seqwrap can enable a two-step approach to fit negative binomial and Poisson observation-level random effect mixed-effects models with empirical Bayes shrinkage of model parameters. In simulations of RNA-seq data from a repeated-measures design, we use seqwrap to show that regularized models substantially outperformed non-informed models and mixed-effects models using transformed counts, with higher sensitivity for detecting differentially expressed genes while maintaining false discovery rates below nominal levels. Regularization also improved model convergence, producing valid estimates for >99.9% of gene targets compared to 85-90% for non-informed count-based models. In real-world data, flexibility in defining distributional assumptions enabled thorough examination of model assumptions and robust sensitivity analysis across modeling approaches.  
- 
-  **Conclusions:** seqwrap enables flexible, principled workflows for analyzing high-dimensional data from complex experimental designs with hierarchical structures. By combining established modeling frameworks with empirical Bayes regularization, seqwrap provides improved statistical performance and model convergence compared to both transformation-based approaches and non-informed models while maintaining generalizability across diverse omics data types.
-  
-:::
-
+-->
 
 <!-- From guidelines: Please note: editable files are required for processing in production. If your manuscript contains any non-editable files (such as PDFs) you will be required to re-submit an editable file when you submit your revised manuscript, or after editorial acceptance in case no revision is necessary. -->
 
 <!-- The abstract should not exceed 350 words -->
 
-**Keywords:** High-dimensional data, RNA-seq, hierarchical models, shrinkage<!-- Three to ten keywords -->
 
 ```{r}
 #| label: settings

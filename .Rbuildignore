@@ -1,0 +1,14 @@
+^renv$
+^renv\.lock$
+^seqwrappaper\.Rproj$
+^\.Rproj\.user$
+^\.positai$
+^\.claude$
+^LICENSE\.md$
+^README\.qmd$
+^README-.*\.png$
+^CONDUCT\.md$
+^CONTRIBUTING\.md$
+^\.binder/Dockerfile$
+^\.binder$
+analysis

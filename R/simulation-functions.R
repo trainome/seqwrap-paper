@@ -11,13 +11,16 @@
 # 06. simulation functions - Wrapper functions for specific models used in
 # loop over all data sets
 # 07. extract_simulations Extract simulations from dataset-specific files.
+# 08. Simulation wrapper functions - runs simulations and saves results.
 
-# 01. filter_fun ##############################################################
-# A function for filter by expression, some genes will have low expression
-# due to sampling variability, these are removed in this function.
-#
-# counts, a count data frame. First column are target id.
-# metadata, a metadat data frame containing group/time combinations
+#' A function for filter by expression, some genes will have low expression
+#' due to sampling variability, these are removed in this function.
+#'
+#'
+#'
+#' counts, a count data frame. First column are target id.
+#' metadata, a metadat data frame containing group/time combinations
+#' @export
 filter_fun <- function(counts, metadata) {
   ## Filter by expression
   # Combine all gene counts after filtering
@@ -54,12 +57,15 @@ filter_fun <- function(counts, metadata) {
 }
 
 
-# 02. simulate_datasets ########################################################
-# A (wrapper) function for simulating data sets
-#
-# nullgenes, the number of genes with null effects
-# condB_true, number of genes with non-zero effects in baseline group diffs
-# condB_timet2_true, number of genes with non-zero effects in interaction
+#' A (wrapper) function for simulating data sets
+#'
+#' @param nullgenes the number of genes with null effects
+#' @param condB_true number of genes with non-zero effects in baseline group diffs
+#' @param condB_timet2_true number of genes with non-zero effects in interaction
+#' @param dispersion_model The model used for dispersion estimates
+#' @param dataset data set id.
+#'
+#' @export
 simulate_datasets <- function(
   nullgenes = 7500,
   condB_true = 1250,
@@ -206,11 +212,15 @@ simulate_datasets <- function(
 }
 
 
-# 03. sigma_summary ###########################################################
-# A summary function to return the dispersion parameter with SE on the log scale
-# mean(predict(x, type = "link)) will give us the predicted log counts.
-# We will put this in the eval fun to also get estimates of the parameters in
-# the generic summary function.
+#' A summary function to return the dispersion parameter with SE on the log
+#' scale mean(predict(x, type = "link)) will give us the predicted log counts.
+#'
+#'
+#'
+#'
+#' We will put this in the eval fun to also get estimates of the parameters in
+#' the generic summary function.
+#' @export
 sigma_summary <- function(x) {
   if (is.null(x$fit$convergence)) {
     conv <- 1
@@ -229,20 +239,23 @@ sigma_summary <- function(x) {
 }
 
 
-# 04. lmer_summary ############################################################
-# A summary function for the lmer model of transformed counts
-# it will return a the singularity diagnostics from lme4.
+#' A summary function for the lmer model of transformed counts
+#' it will return a the singularity diagnostics from lme4.
+#'
+#' @export
 lmer_summary <- function(x) {
   out <- data.frame(isSingular = lme4::isSingular(x))
 
   return(out)
 }
 
-# 05. poisson_summary #########################################################
-# A summary function for the Poisson models. This will use the convergence
-# diagnostic in glmmTMB to indicate convergence. The pdHess indicator from the
-# Hessian matrices
-# see https://stackoverflow.com/questions/79110546/glmmtmb-convergence-messages
+
+#' A summary function for the Poisson models. This will use the convergence
+#' diagnostic in glmmTMB to indicate convergence. The pdHess indicator from the
+#' Hessian matrices
+#' see https://stackoverflow.com/questions/79110546/glmmtmb-convergence-messages
+#'
+#' @export
 poisson_summary <- function(x) {
   if (is.null(x$fit$convergence)) {
     conv <- 1
@@ -255,15 +268,92 @@ poisson_summary <- function(x) {
 }
 
 
-# 06. simulation functions ####################################################
-# Model 1 and 2 simulation function
-#
-#
-# Model 1 and 2 are the naive and informed negative binomial models
-# weighted_loess, should a weighted loess be used for mean-dispersion estimates
-# dataset, when used in a loop dataset indicate the index
-# dofit, if false only data management is done
+#' Download simulations
+#'
+#' The simulations in this project are computationally intensive. Simulation
+#' results are available at
+#' Chidimma Echebiri; Ellefsen, Stian; Ahmad, Rafi; Hammarström, Daniel,
+#' 2026, "Simulated data sets for: seqwrap: an R package for flexible iterative
+#'  fitting of high-dimensional data", https://doi.org/10.18710/I7U71O,
+#'  DataverseNO, V1
+#'
+#'
+#' @param doi The DOI in our data set.
+#' @param dest_dir The destination folder. Shoul be placed in raw data
+#' (added to .gitignore)
+#' @param server For reuse of the function, if other dataverse servers
+#' are to be used.
+#' @param overwrite If we need to overwrite individual files.
+#'
+#' @export
+download_dataverse <- function(
+  doi = "doi:10.18710/I7U71O",
+  dest_dir = here::here("analysis/data/raw_data"),
+  server = "dataverse.no",
+  overwrite = FALSE
+) {
+  # Clean DOI format
+  doi <- sub("https://doi.org/", "doi:", doi, fixed = TRUE)
+  doi <- sub("http://doi.org/", "doi:", doi, fixed = TRUE)
+  if (!grepl("^doi:", doi)) doi <- paste0("doi:", doi)
 
+  # Get file metadata
+  meta_url <- sprintf(
+    "https://%s/api/datasets/:persistentId/?persistentId=%s",
+    server,
+    doi
+  )
+  meta_file <- tempfile(fileext = ".json")
+
+  system2(
+    "curl.exe",
+    args = c("-k", "-L", shQuote(meta_url), "-o", shQuote(meta_file))
+  )
+
+  meta <- jsonlite::fromJSON(meta_file, simplifyDataFrame = FALSE)
+  files <- meta$data$latestVersion$files
+  file.remove(meta_file)
+
+  message("Found ", length(files), " files to download")
+
+  purrr::walk(files, function(f) {
+    dir <- if (is.null(f$directoryLabel)) "" else f$directoryLabel
+    out_dir <- file.path(dest_dir, dir)
+    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+    dest <- file.path(out_dir, f$dataFile$filename)
+
+    if (file.exists(dest) && !overwrite) {
+      message(
+        "Skipping (already exists): ",
+        file.path(dir, f$dataFile$filename)
+      )
+      return(invisible(NULL))
+    }
+
+    file_url <- sprintf(
+      "https://%s/api/access/datafile/%s",
+      server,
+      f$dataFile$id
+    )
+    message("Downloading: ", file.path(dir, f$dataFile$filename))
+    system2(
+      "curl.exe",
+      args = c("-k", "-L", shQuote(file_url), "-o", shQuote(dest))
+    )
+  })
+
+  invisible(dest_dir)
+}
+
+
+#' Model 1 and 2 simulation function
+#'
+#' Model 1 and 2 are the naive and informed negative binomial models
+#' weighted_loess, should a weighted loess be used for mean-dispersion estimates
+#' dataset, when used in a loop dataset indicate the index
+#' dofit, if false only data management is done
+#' @export
 m1_m2_sim <- function(
   combined_data,
   dataset,
@@ -523,9 +613,11 @@ m1_m2_sim <- function(
 }
 
 
-# This is the model for transformed counts data
-# the function performs transformation and fits models over a combined_data
-# object.
+#' Model 3 simulation function
+#'
+#' This is the model for transformed counts data the function performs
+#' transformation and fits models over a combined_data object.
+#' @export
 m3_sim <- function(combined_data, dataset, dofit = TRUE, CORES = 2) {
   evaluations <- list()
   summaries <- list()
@@ -605,8 +697,14 @@ m3_sim <- function(combined_data, dataset, dofit = TRUE, CORES = 2) {
   ))
 }
 
-# This function does the Poisson models with observation level random effects
-# both in a naive and informed version.
+
+#' Model 4 and 5 simulation function
+#'
+#' This function does the Poisson models with observation level random effects
+#' both in a naive and informed version.
+#'
+#'
+#' @export
 m4_m5_sim <- function(combined_data, dataset, dofit = TRUE, CORES = 2) {
   evaluations <- list()
   summaries <- list()
@@ -794,12 +892,20 @@ m4_m5_sim <- function(combined_data, dataset, dofit = TRUE, CORES = 2) {
 }
 
 
-# 07. extract_simulations #####################################################
-
+#' Extract simulation results
+#'
+#' This function extract simulations results for analysis. Simulation results
+#' are either downloaded (download_dataverse) or simulated using the simulation
+#' wrapper.
+#'
+#' @param _path Path to simulation results.
+#' @param disp_scenario Marker for the simulation scenario (dispersion setting).
+#'
+#' @export
 extract_simulations <- function(
-  evaluations_path = "data_sim/evaluations",
-  estimates_path = "data_sim/estimates",
-  populationeffects_path = "data_sim/simdata/popeffect",
+  evaluations_path = "analysis/data/raw_data/evaluations",
+  estimates_path = "analysis/data/raw_data/estimates",
+  populationeffects_path = "analysis/data/raw_data/popeffect",
   disp_scenario = "s1"
 ) {
   # Evaluations
@@ -848,9 +954,11 @@ extract_simulations <- function(
 }
 
 
-# 08. Sigma summary common for both Poisson and NB models on real data
-# Includes simulated residuals.
-
+#' Sigma summary common for both Poisson and NB models on real data
+#'
+#' A summary function used in modelling
+#'
+#' @export
 sigma_summary2 <- function(x) {
   if (is.null(x$fit$convergence)) {
     conv <- 1
@@ -899,10 +1007,16 @@ sigma_summary2 <- function(x) {
 }
 
 
-## 08. Extract raw counts ####################################################
-# This function calculate mean counts for each data set
-# in the simulation at the relevant terms
-extract_rawcounts <- function(sim_folder = "data_sim/simdata2/raw/") {
+#' Extract raw counts ion simulated data
+#'
+#' This function calculate mean counts for each data set in the simulation
+#' at the relevant terms.
+#'
+#' @param sim_folder Path to the simulation folder
+#' @export
+extract_rawcounts <- function(
+  sim_folder = "analysis/data/raw_data/simdata2/raw/"
+) {
   # Sample ids for each data set
   samps <- list(
     small_baseline_samp = c(
@@ -973,4 +1087,398 @@ extract_rawcounts <- function(sim_folder = "data_sim/simdata2/raw/") {
 
   out <- bind_rows(d)
   return(out)
+}
+
+
+#' Simulation wrapper 1
+#'
+#' A wrapper for the simulation functions for scenario 1
+#'
+#' @param cores Number of cores to be used
+#' @param seed Set the seed.
+#' @param overwrite Should available results be overwritten?
+#'
+#'
+#' @export
+sim_wrap1 <- function(cores, seed = 1, overwrite = FALSE) {
+  set.seed(1)
+
+  for (i in 1:10) {
+    d <- simulate_datasets(
+      nullgenes = 7500,
+      condB_true = 1250,
+      condB_time2_true = 1250,
+      dispersion_model = trend_model_observed,
+      dataset = i
+    )
+
+    if (!dir.exists("analysis/data/raw_data/simdata/raw/"))
+      dir.create("analysis/data/raw_data/simdata/raw/", recursive = TRUE)
+    if (!dir.exists("analysis/data/raw_data/simdata/clean/"))
+      dir.create("analysis/data/raw_data/simdata/clean/", recursive = TRUE)
+    if (!dir.exists("analysis/data/raw_data/simdata/popeffect/"))
+      dir.create("analysis/data/raw_data/simdata/popeffect/", recursive = TRUE)
+
+    if (!dir.exists("analysis/data/raw_data/estimates"))
+      dir.create("analysis/data/raw_data/estimates", recursive = TRUE)
+    if (!dir.exists("analysis/data/raw_data/evaluations"))
+      dir.create("analysis/data/raw_data/evaluations", recursive = TRUE)
+
+    if (
+      !length(list.files("analysis/data/raw_data/estimates")) > 0 | overwrite
+    ) {
+      # Save simulated data for later
+      saveRDS(
+        d$simdat,
+        file = paste0("analysis/data/raw_data/simdata/raw/dataset_", i, ".RDS")
+      )
+      saveRDS(
+        d$combined_data,
+        file = paste0(
+          "analysis/data/raw_data/simdata/clean/clean_dataset_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        d$population_effects,
+        file = paste0(
+          "analysis/data/raw_data/simdata/popeffect/population_effects_",
+          i,
+          ".RDS"
+        )
+      )
+
+      # Model 1 and 2 ##########################
+      # Fitting naive and informed Neg-Binom model. The informed model has
+      # a wider prior for the mean-dispersion fit as we use weighted estimates
+      # of the loess regression.
+      m1_m2_results <- m1_m2_sim(
+        d$combined_data,
+        dataset = i,
+        dofit = TRUE,
+        weighted_loess = TRUE,
+        CORES = cores
+      )
+
+      saveRDS(
+        m1_m2_results$summaries_m1,
+        file = paste0(
+          "analysis/data/raw_data/estimates/m1_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m1_m2_results$summaries_m2,
+        file = paste0(
+          "analysis/data/raw_data/estimates/m2_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+
+      saveRDS(
+        m1_m2_results$evaluations_m1,
+        file = paste0(
+          "analysis/data/raw_data/evaluations/m1_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m1_m2_results$evaluations_m2,
+        file = paste0(
+          "analysis/data/raw_data/evaluations/m2_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+
+      # Model 1b and 2b ##########################
+      # Fitting naive and informed Neg-Binom model. The informed model has
+      # a more narrow prior for the mean-dispersion fit as we use un-weighted estimates
+      # of the loess regression.
+      # m1_m2_results_b <- m1_m2_sim(d$combined_data,
+      #                            dataset = i,
+      #                            dofit = TRUE,
+      #                            weighted_loess = FALSE,
+      #                            CORES = cores)
+      #
+      # saveRDS(m1_m2_results_b$summaries_m1, file = paste0("analysis/data/raw_data/estimates/m1b_estimates_", i, ".RDS"))
+      # saveRDS(m1_m2_results_b$summaries_m2, file = paste0("analysis/data/raw_data/estimates/m2b_estimates_", i, ".RDS"))
+      #
+      # saveRDS(m1_m2_results_b$evaluations_m1, file = paste0("analysis/data/raw_data/evaluations/m1b_evaluations_", i, ".RDS"))
+      # saveRDS(m1_m2_results_b$evaluations_m2, file = paste0("analysis/data/raw_data/evaluations/m2b_evaluations_", i, ".RDS"))
+
+      # Model 3 ################################################
+      # A model for transformed counts.
+      m3_results <- m3_sim(
+        d$combined_data,
+        dataset = i,
+        dofit = TRUE,
+        CORES = cores
+      )
+
+      saveRDS(
+        m3_results$summaries_m3,
+        file = paste0(
+          "analysis/data/raw_data/estimates/m3_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m3_results$evaluations_m3,
+        file = paste0(
+          "analysis/data/raw_data/evaluations/m3_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+
+      # Model 4 and 5 ################################################
+      # This is the Poisson model with observation-level random effects
+      # Model 5 is the informed model (with priors).
+      m4_m5_results <- m4_m5_sim(
+        d$combined_data,
+        dataset = i,
+        dofit = TRUE,
+        CORES = cores
+      )
+
+      saveRDS(
+        m4_m5_results$summaries_m4,
+        file = paste0(
+          "analysis/data/raw_data/estimates/m4_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m4_m5_results$summaries_m5,
+        file = paste0(
+          "analysis/data/raw_data/estimates/m5_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+
+      saveRDS(
+        m4_m5_results$evaluations_m4,
+        file = paste0(
+          "analysis/data/raw_data/evaluations/m4_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m4_m5_results$evaluations_m5,
+        file = paste0(
+          "analysis/data/raw_data/evaluations/m5_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+
+      print(paste0("Simulation 1:", i, " is done."))
+    }
+  }
+}
+
+
+#' Simulation wrapper 2
+#'
+#' A wrapper for the simulation functions for scenario 2
+#'
+#' @param cores Number of cores to be used
+#' @param seed Set the seed.
+#' @param overwrite Should available results be overwritten?
+#'
+#'
+#' @export
+sim_wrap2 <- function(cores, seed = 1, overwrite = FALSE) {
+  set.seed(seed)
+
+  for (i in 1:10) {
+    d <- simulate_datasets(
+      nullgenes = 7500,
+      condB_true = 1250,
+      condB_time2_true = 1250,
+      dispersion_model = trend_model_observed_noweights,
+      dataset = i
+    )
+
+    if (!dir.exists("analysis/data/raw_data/simdata2/raw/"))
+      dir.create("analysis/data/raw_data/simdata2/raw/", recursive = TRUE)
+    if (!dir.exists("analysis/data/raw_data/simdata2/clean/"))
+      dir.create("analysis/data/raw_data/simdata2/clean/", recursive = TRUE)
+    if (!dir.exists("analysis/data/raw_data/simdata2/popeffect/"))
+      dir.create("analysis/data/raw_data/simdata2/popeffect/", recursive = TRUE)
+
+    if (!dir.exists("analysis/data/raw_data/estimates2"))
+      dir.create("analysis/data/raw_data/estimates2", recursive = TRUE)
+    if (!dir.exists("analysis/data/raw_data/evaluations2"))
+      dir.create("analysis/data/raw_data/evaluations2", recursive = TRUE)
+
+    if (
+      !length(list.files("analysis/data/raw_data/estimates2")) > 0 | overwrite
+    ) {
+      # Save simulated data for later
+      saveRDS(
+        d$simdat,
+        file = paste0("analysis/data/raw_data/simdata2/raw/dataset_", i, ".RDS")
+      )
+      saveRDS(
+        d$combined_data,
+        file = paste0(
+          "analysis/data/raw_data/simdata2/clean/clean_dataset_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        d$population_effects,
+        file = paste0(
+          "analysis/data/raw_data/simdata2/popeffect/population_effects_",
+          i,
+          ".RDS"
+        )
+      )
+
+      # Model 1 and 2 ##########################
+      # Fitting naive and informed Neg-Binom model. The informed model has
+      # a wider prior for the mean-dispersion fit as we use weighted estimates
+      # of the loess regression.
+      m1_m2_results <- m1_m2_sim(
+        d$combined_data,
+        dataset = i,
+        dofit = TRUE,
+        weighted_loess = TRUE,
+        CORES = cores
+      )
+
+      saveRDS(
+        m1_m2_results$summaries_m1,
+        file = paste0(
+          "analysis/data/raw_data/estimates2/m1_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m1_m2_results$summaries_m2,
+        file = paste0(
+          "analysis/data/raw_data/estimates2/m2_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+
+      saveRDS(
+        m1_m2_results$evaluations_m1,
+        file = paste0(
+          "analysis/data/raw_data/evaluations2/m1_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m1_m2_results$evaluations_m2,
+        file = paste0(
+          "analysis/data/raw_data/evaluations2/m2_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+
+      # Model 1b and 2b ##########################
+      # Fitting naive and informed Neg-Binom model. The informed model has
+      # a more narrow prior for the mean-dispersion fit as we use un-weighted estimates
+      # of the loess regression.
+      # m1_m2_results_b <- m1_m2_sim(d$combined_data,
+      #                            dataset = i,
+      #                            dofit = TRUE,
+      #                            weighted_loess = FALSE,
+      #                            CORES = cores)
+      #
+      # saveRDS(m1_m2_results_b$summaries_m1, file = paste0("analysis/data/raw_data/estimates/m1b_estimates_", i, ".RDS"))
+      # saveRDS(m1_m2_results_b$summaries_m2, file = paste0("analysis/data/raw_data/estimates/m2b_estimates_", i, ".RDS"))
+      #
+      # saveRDS(m1_m2_results_b$evaluations_m1, file = paste0("analysis/data/raw_data/evaluations/m1b_evaluations_", i, ".RDS"))
+      # saveRDS(m1_m2_results_b$evaluations_m2, file = paste0("analysis/data/raw_data/evaluations/m2b_evaluations_", i, ".RDS"))
+
+      # Model 3 ################################################
+      # A model for transformed counts.
+      m3_results <- m3_sim(
+        d$combined_data,
+        dataset = i,
+        dofit = TRUE,
+        CORES = cores
+      )
+
+      saveRDS(
+        m3_results$summaries_m3,
+        file = paste0(
+          "analysis/data/raw_data/estimates2/m3_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m3_results$evaluations_m3,
+        file = paste0(
+          "analysis/data/raw_data/evaluations2/m3_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+
+      # Model 4 and 5 ################################################
+      # This is the Poisson model with observation-level random effects
+      # Model 5 is the informed model (with priors).
+      m4_m5_results <- m4_m5_sim(
+        d$combined_data,
+        dataset = i,
+        dofit = TRUE,
+        CORES = cores
+      )
+
+      saveRDS(
+        m4_m5_results$summaries_m4,
+        file = paste0(
+          "analysis/data/raw_data/estimates2/m4_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m4_m5_results$summaries_m5,
+        file = paste0(
+          "analysis/data/raw_data/estimates2/m5_estimates_",
+          i,
+          ".RDS"
+        )
+      )
+
+      saveRDS(
+        m4_m5_results$evaluations_m4,
+        file = paste0(
+          "analysis/data/raw_data/evaluations2/m4_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+      saveRDS(
+        m4_m5_results$evaluations_m5,
+        file = paste0(
+          "analysis/data/raw_data/evaluations2/m5_evaluations_",
+          i,
+          ".RDS"
+        )
+      )
+
+      print(paste0("Simulation 1:", i, " is done."))
+    }
+  }
 }
