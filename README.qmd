@@ -26,7 +26,9 @@ knitr::opts_chunk$set(
 Title <- "Title of your paper goes here"
 ```
 
+<!---
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/trainome/seqwrappaper/master?urlpath=rstudio)
+--->
 
 This repository contains all relevant code to reproduce the results presented in the paper *"seqwrap: an R package for flexible iterative fitting of high-dimensional data"* (in review). The paper presents the [seqwrap](https://github.com/trainome/seqwrap) package, designed for the analysis of omic-type (e.g., RNA-seq, proteomics) data using user-defined regression models.
 
